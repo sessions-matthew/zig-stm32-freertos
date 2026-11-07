@@ -19,6 +19,13 @@ pub inline fn getSystemCoreClock() u32 {
 // Peripheral Clock Control
 // ============================================================================
 
+/// Errata 2.1.1: Bus synchronization barrier after RCC peripheral clock enable.
+/// Reading back any RCC register ensures the peripheral clock is active before
+/// the Cortex-M0+ core accesses peripheral MMIO registers.
+pub inline fn rccSync() void {
+    _ = registers.getRcc().CR;
+}
+
 pub inline fn enableGpio(port: gpio.Port) void {
     const r = registers.getRcc();
     const mask = switch (port) {
@@ -27,6 +34,7 @@ pub inline fn enableGpio(port: gpio.Port) void {
         .C => registers.RCC_IOPENR_GPIOCEN,
     };
     r.IOPENR |= mask;
+    rccSync();
 }
 
 pub inline fn disableGpio(port: gpio.Port) void {
@@ -41,6 +49,7 @@ pub inline fn disableGpio(port: gpio.Port) void {
 
 pub inline fn enableLpuart1() void {
     registers.getRcc().APB1ENR |= registers.RCC_APB1ENR_LPUART1EN;
+    rccSync();
 }
 
 pub inline fn disableLpuart1() void {
@@ -49,6 +58,7 @@ pub inline fn disableLpuart1() void {
 
 pub inline fn enableSpi1() void {
     registers.getRcc().APB2ENR |= registers.RCC_APB2ENR_SPI1EN;
+    rccSync();
 }
 
 pub inline fn disableSpi1() void {
@@ -57,6 +67,7 @@ pub inline fn disableSpi1() void {
 
 pub inline fn enableDma1() void {
     registers.getRcc().AHBENR |= registers.RCC_AHBENR_DMA1EN;
+    rccSync();
 }
 
 pub inline fn disableDma1() void {

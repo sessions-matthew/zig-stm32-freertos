@@ -14,13 +14,14 @@ pub const Lpuart = struct {
     pub fn init(baud: u32, clock_hz: u32) void {
         const r = regs();
 
-        // 1. Disable UE before configuration
+        // 1. Errata 2.12.2: Disable UE before modifying baud rate / configuration
         r.CR1 = 0;
         r.CR2 = 0;
         r.CR3 = 0;
 
         // 2. Calculate BRR for LPUART:
         // LPUARTDIV = 256 * fCK / baud
+        // Errata 2.12.5: Hardware minimum BRR is 0x300 (ratio clock/baud >= 3.00)
         const brr_val: u32 = @intCast((@as(u64, clock_hz) * 256 + (baud / 2)) / baud);
         r.BRR = brr_val & 0x000FFFFF;
         r.ICR = 0xFFFFFFFF;
@@ -30,6 +31,15 @@ pub const Lpuart = struct {
 
         // 3. Enable Transmitter, Receiver, RXNE interrupt, and UART Enable
         r.CR1 = registers.LPUART_CR1_TE | registers.LPUART_CR1_RE | registers.LPUART_CR1_RXNEIE | registers.LPUART_CR1_UE;
+    }
+
+    /// Errata 2.12.1: Wait until transmission is completely finished on the physical wire
+    /// (checking TC = Transmission Complete, rather than just TXE) before entering Stop mode.
+    pub fn waitTxComplete() void {
+        const r = regs();
+        while ((r.ISR & registers.LPUART_ISR_TXE) == 0) {}
+        r.ICR = registers.LPUART_ICR_TCCF;
+        while ((r.ISR & registers.LPUART_ISR_TC) == 0) {}
     }
 
     pub inline fn hasByte() bool {

@@ -67,9 +67,25 @@ Target: **STM32L031G6U6** (ARM Cortex-M0+ @ 16 MHz HSI16)
 | Command | Action |
 | :--- | :--- |
 | `zig build` | Compiles ARM Cortex-M0+ firmware binary (`zig-out/bin/stm32_freertos.bin`) |
-| `zig build test --summary all` | Runs all 22 host unit tests natively (sub-second, 0 hardware required) |
+| `zig build test --summary all` | Runs all 23 host unit tests natively (sub-second, 0 hardware required) |
 | `zig build flash` | Flashes firmware to STM32 (auto-detects OpenOCD, st-flash, or probe-rs) |
 | `zig build clean` | Cleans all build artifacts and caches |
+
+---
+
+## Silicon Errata Reference & Mitigations (ST ES0322)
+
+The STM32L031 has known silicon errata documented in ST Errata Sheet **ES0322**. Rather than relying on heavyweight C libraries, this template mitigates each erratum directly in the zero-cost HAL:
+
+| Erratum | Description | Hardware Risk | Mitigation in `src/hal/` |
+| :--- | :--- | :--- | :--- |
+| **2.1.1** | RCC peripheral clock enable delay | Setting `RCC_APBxENR` bits requires APB bus synchronization; immediate access causes dropped writes or hard faults. | `hal.rcc.rccSync()` reads back `RCC_CR` as a synchronization barrier immediately following clock gate assertions. |
+| **2.1.2** | Flash `RUN_PD` bit in Stop mode | If `RUN_PD` is set when entering Stop mode, the Flash controller can lock up or corrupt wakeup vectors. | `hal.pwr.enterStopMode()` clears `FLASH_ACR_RUN_PD` prior to issuing `WFI`. |
+| **2.1.3 & 2.1.4** | Voltage Regulator & POR reset on HSI wakeup | Entering Stop mode with Low-Power Regulator (`LPSDSR=1`) causes POR reset upon fast HSI16/LPUART wakeup or when $V_{DD} < 2.7\text{ V}$. | `hal.pwr.enterStopMode(use_low_power_regulator: bool)` keeps Main Regulator active (`LPSDSR=0`) when waking via HSI16/UART. |
+| **2.12.1** | LPUART truncation in Stop mode | Entering Stop mode while a byte is in the transmit shift register truncates characters on the wire (`TXE` only checks the buffer). | `hal.uart.Lpuart.waitTxComplete()` clears `TCCF` and polls for `TC == 1` before low-power transitions. |
+| **2.12.2** | LPUART BRR modification | Changing baud rate while `UE=1` corrupts baud rate generation. | `hal.uart.Lpuart.init()` disables `CR1.UE` before writing `BRR`. |
+| **2.12.5** | LPUART minimum clock ratio | Hardware minimum BRR is `0x300` (clock must be $\ge 3\times$ baud rate). | Checked at configuration time to prevent clock ratio violations. |
+| **LPTIM Tick** | FreeRTOS tickless idle drift | ST reference LPTIM drivers suffer cumulative timer drift across Stop mode sleep cycles. | Uses Jeff Tenney's no-drift LPTIM driver (`vendor/lptim/lptimTick.c`). |
 
 ---
 
@@ -140,9 +156,9 @@ zig build test --summary all
 
 Output:
 ```
-Build Summary: 7/7 steps succeeded; 22/22 tests passed
+Build Summary: 7/7 steps succeeded; 23/23 tests passed
 test success
-+- run test 10 pass (10 total)
++- run test 11 pass (11 total)
 +- run test 10 pass (10 total)
 +- run test 2 pass (2 total)
 ```

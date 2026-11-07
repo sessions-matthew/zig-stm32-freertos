@@ -87,26 +87,40 @@ pub const Pwr = struct {
         return sec * 1000 + sub_ms;
     }
 
-    /// Configure Cortex-M0+ and PWR controller for Stop mode
-    pub fn enterStopMode() void {
+    /// Configure Cortex-M0+ and PWR controller for Stop mode.
+    ///
+    /// Parameters:
+    /// - `use_low_power_regulator`: If false, keeps the Main Regulator ON during Stop mode.
+    ///   (Errata 2.1.3 & 2.1.4: MUST be false when waking up via HSI16/LPUART or when VDD < 2.7V
+    ///   to prevent brownout/POR reset).
+    pub fn enterStopMode(use_low_power_regulator: bool) void {
         const r = regs();
 
-        // 1. Select Stop mode (clear PDDS) and Low-Power Stop (set LPSDSR)
-        r.CR = (r.CR & ~registers.PWR_CR_PDDS) | registers.PWR_CR_LPSDSR;
+        // 1. Select Stop mode (clear PDDS) and regulator mode (Errata 2.1.3/2.1.4)
+        var cr = r.CR & ~registers.PWR_CR_PDDS;
+        if (use_low_power_regulator) {
+            cr |= registers.PWR_CR_LPSDSR;
+        } else {
+            cr &= ~registers.PWR_CR_LPSDSR;
+        }
+        r.CR = cr;
 
-        // 2. Set SLEEPDEEP bit in Cortex-M0+ System Control Register (SCR)
+        // 2. Errata 2.1.2: Flash must not be in RUN_PD before Stop mode
+        registers.getFlash().ACR &= ~registers.FLASH_ACR_RUN_PD;
+
+        // 3. Set SLEEPDEEP bit in Cortex-M0+ System Control Register (SCR)
         if (!builtin.is_test) {
             const SCR_ADDR: usize = 0xE000ED10;
             const scr: *volatile u32 = @ptrFromInt(SCR_ADDR);
             scr.* |= (1 << 2); // SLEEPDEEP
 
-            // 3. Clear wake-up flag
+            // 4. Clear wake-up flag
             r.CR |= registers.PWR_CR_CWUF;
 
-            // 4. Wait For Interrupt (WFI)
+            // 5. Wait For Interrupt (WFI)
             asm volatile ("wfi");
 
-            // 5. Clear SLEEPDEEP upon wake
+            // 6. Clear SLEEPDEEP upon wake
             scr.* &= ~(@as(u32, 1) << 2);
         }
     }
@@ -125,4 +139,17 @@ test "PWR backup register read and write" {
 
     Pwr.writeBackup(2, 0x12345678);
     try std.testing.expectEqual(@as(u32, 0x12345678), Pwr.readBackup(2));
+}
+
+test "PWR enterStopMode regulator selection (Errata 2.1.3/2.1.4)" {
+    registers.mock_pwr = std.mem.zeroes(registers.PwrRegs);
+    registers.mock_flash = std.mem.zeroes(registers.FlashRegs);
+
+    // Low power regulator selected
+    Pwr.enterStopMode(true);
+    try std.testing.expect((registers.mock_pwr.CR & registers.PWR_CR_LPSDSR) != 0);
+
+    // Main regulator kept on for HSI16 wakeup (Errata 2.1.3)
+    Pwr.enterStopMode(false);
+    try std.testing.expect((registers.mock_pwr.CR & registers.PWR_CR_LPSDSR) == 0);
 }
