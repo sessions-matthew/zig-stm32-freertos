@@ -1,6 +1,7 @@
 # Zig + FreeRTOS + STM32 Starter Template (`zig-stm32-freertos`)
 
 [![Discord - Zig LLM Group](https://img.shields.io/badge/Discord-Zig%20LLM%20Group-5865F2?logo=discord&logoColor=white)](https://discord.gg/qs5gbtg28H)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A clean, standalone project template pairing **Zig 0.17.0** with **FreeRTOS Static** on the **STM32L031** ARM Cortex-M0+.
 
@@ -162,6 +163,12 @@ test success
 +- run test 10 pass (10 total)
 +- run test 2 pass (2 total)
 ```
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
