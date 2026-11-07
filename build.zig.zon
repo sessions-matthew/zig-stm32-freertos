@@ -1,6 +1,6 @@
 .{
-    .name = .zig_stm32,
-    .fingerprint = 0xd975ef2b2e31b822,
+    .name = .zig_stm32_freertos,
+    .fingerprint = 0x47e8f24e0f9b772d,
     .version = "0.1.0",
     .minimum_zig_version = "0.17.0",
     .dependencies = .{},

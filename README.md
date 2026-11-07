@@ -1,4 +1,4 @@
-# Zig + FreeRTOS + STM32 Starter Template (`zig-stm32`)
+# Zig + FreeRTOS + STM32 Starter Template (`zig-stm32-freertos`)
 
 [![Discord - Zig LLM Group](https://img.shields.io/badge/Discord-Zig%20LLM%20Group-5865F2?logo=discord&logoColor=white)](https://discord.gg/qs5gbtg28H)
 
